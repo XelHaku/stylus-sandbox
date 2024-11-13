@@ -26,7 +26,15 @@
 extern crate alloc;
 
 /// Import items from the SDK. The prelude contains common traits and macros.
-use stylus_sdk::{alloy_primitives::U256, prelude::*};
+use stylus_sdk::{alloy_primitives::U256, prelude::*,alloy_sol_types::sol};
+// sol! macro event declaration
+// Up to 3 parameters can be indexed.
+// Indexed parameters helps you filter the logs efficiently
+sol! {
+    event Log(address indexed sender, string message);
+    event AnotherLog();
+}
+
 
 // Define some persistent storage using the Solidity ABI.
 // `Counter` will be the entrypoint.
@@ -59,9 +67,17 @@ impl Counter {
     pub fn add_number(&mut self, new_number: U256) {
         self.number.set(new_number + self.number.get());
     }
+  pub fn call_increment(&mut self) {
+      
+        self.increment();
+    }
 
-    /// Increments `number` and updates its value in storage.
-    pub fn increment(&mut self) {
+}
+
+
+
+impl Counter {
+      fn increment(&mut self) {
         let number = self.number.get();
         self.set_number(number + U256::from(1));
     }
