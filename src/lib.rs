@@ -222,4 +222,52 @@ impl<T: Erc20Params> Erc20<T> {
     pub fn allowance(&self, owner: Address, spender: Address) -> U256 {
         self.allowances.getter(owner).get(spender)
     }
-}
+}error[E0433]: failed to resolve: use of undeclared crate or module `alloc`
+  --> src/lib.rs:12:5
+   |
+12 | use alloc::string::String;
+   |     ^^^^^ use of undeclared crate or module `alloc`
+   |
+   = help: add `extern crate alloc` to use the `alloc` crate
+
+error[E0432]: unresolved import `alloc`
+   --> src/lib.rs:147:1
+    |
+147 | #[public]
+    | ^^^^^^^^^ help: a similar path exists: `std::alloc`
+    |
+    = note: this error originates in the attribute macro `public` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0433]: failed to resolve: use of undeclared crate or module `alloc`
+  --> src/lib.rs:57:10
+   |
+57 | #[derive(SolidityError)]
+   |          ^^^^^^^^^^^^^ use of undeclared crate or module `alloc`
+   |
+   = help: add `extern crate alloc` to use the `alloc` crate
+   = note: this error originates in the derive macro `SolidityError` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider importing this module
+   |
+12 + use std::vec;
+   |
+
+error[E0277]: the trait bound `Result<bool, Erc20Error>: EncodableReturnType` is not satisfied
+   --> src/lib.rs:175:61
+    |
+175 |     pub fn transfer(&mut self, to: Address, value: U256) -> Result<bool, Erc20Error> {
+    |                                                             ^^^^^^ the trait `EncodableReturnType` is not implemented for `Result<bool, Erc20Error>`
+    |
+    = help: the trait `EncodableReturnType` is implemented for `Result<T, E>`
+
+error[E0277]: the trait bound `Result<bool, Erc20Error>: EncodableReturnType` is not satisfied
+   --> src/lib.rs:187:10
+    |
+187 |     ) -> Result<bool, Erc20Error> {
+    |          ^^^^^^ the trait `EncodableReturnType` is not implemented for `Result<bool, Erc20Error>`
+    |
+    = help: the trait `EncodableReturnType` is implemented for `Result<T, E>`
+
+Some errors have detailed explanations: E0277, E0432, E0433.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `stylus-hello-world` (lib) due to 5 previous errors
+xel@BlueBlack:~/git/stylus-hello-world$ 
