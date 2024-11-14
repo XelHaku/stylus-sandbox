@@ -1,273 +1,73 @@
-//! Implementation of the ERC-20 standard
 //!
-//! The eponymous [`Erc20`] type provides all the standard methods,
-//! and is intended to be inherited by other contract types.
+//! Stylus Cupcake Example
 //!
-//! You can configure the behavior of [`Erc20`] via the [`Erc20Params`] trait,
-//! which allows specifying the name, symbol, and decimals of the token.
+//! The program is ABI-equivalent with Solidity, which means you can call it from both Solidity and Rust.
+//! To do this, run `cargo stylus export-abi`.
 //!
-//! Note that this code is unaudited and not fit for production use.
+//! Note: this code is a template-only and has not been audited.
+//!
 
-// Imported packages
-use alloc::string::String;
-use alloy_primitives::{Address, U256};
-use alloy_sol_types::sol;
-use core::marker::PhantomData;
-use stylus_sdk::{
-    evm,
-    msg,
-    prelude::*,
-};
+// Allow `cargo stylus export-abi` to generate a main function if the "export-abi" feature is enabled.
+#![cfg_attr(not(feature = "export-abi"), no_main)]
+extern crate alloc;
 
-pub trait Erc20Params {
-    /// Immutable token name
-    const NAME: &'static str;
+use alloy_primitives::{Address, Uint};
+// Import items from the SDK. The prelude contains common traits and macros.
+use stylus_sdk::alloy_primitives::U256;
+use stylus_sdk::prelude::*;
+use stylus_sdk::{block, console};
 
-    /// Immutable token symbol
-    const SYMBOL: &'static str;
-
-    /// Immutable token decimals
-    const DECIMALS: u8;
-}
-
+// Define persistent storage using the Solidity ABI.
+// `VendingMachine` will be the entrypoint for the contract.
 sol_storage! {
-    /// Erc20 implements all ERC-20 methods.
-    pub struct Erc20<T> {
-        /// Maps users to balances
-        mapping(address => uint256) balances;
-        /// Maps users to a mapping of each spender's allowance
-        mapping(address => mapping(address => uint256)) allowances;
-        /// The total supply of the token
-        uint256 total_supply;
-        /// Used to allow [`Erc20Params`]
-        PhantomData<T> phantom;
+    #[entrypoint]
+    pub struct VendingMachine {
+        // Mapping from user addresses to their cupcake balances.
+        mapping(address => uint256) cupcake_balances;
+        // Mapping from user addresses to the last time they received a cupcake.
+        mapping(address => uint256) cupcake_distribution_times;
     }
 }
 
-// Declare events and Solidity error types
-sol! {
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-
-    error InsufficientBalance(address from, uint256 have, uint256 want);
-    error InsufficientAllowance(address owner, address spender, uint256 have, uint256 want);
-}
-
-/// Represents the ways methods may fail.
-#[derive(SolidityError)]
-pub enum Erc20Error {
-    InsufficientBalance(InsufficientBalance),
-    InsufficientAllowance(InsufficientAllowance),
-}
-
-// These methods aren't exposed to other contracts
-// Methods marked as "pub" here are usable outside of the erc20 module (i.e. they're callable from lib.rs)
-// Note: modifying storage will become much prettier soon
-impl<T: Erc20Params> Erc20<T> {
-    /// Movement of funds between 2 accounts
-    /// (invoked by the external transfer() and transfer_from() functions )
-    pub fn _transfer(
-        &mut self,
-        from: Address,
-        to: Address,
-        value: U256,
-    ) -> Result<(), Erc20Error> {
-        // Decreasing sender balance
-        let mut sender_balance = self.balances.setter(from);
-        let old_sender_balance = sender_balance.get();
-        if old_sender_balance < value {
-            return Err(Erc20Error::InsufficientBalance(InsufficientBalance {
-                from,
-                have: old_sender_balance,
-                want: value,
-            }));
-        }
-        sender_balance.set(old_sender_balance - value);
-
-        // Increasing receiver balance
-        let mut to_balance = self.balances.setter(to);
-        let new_to_balance = to_balance.get() + value;
-        to_balance.set(new_to_balance);
-
-        // Emitting the transfer event
-        evm::log(Transfer { from, to, value });
-        Ok(())
-    }
-
-    /// Mints `value` tokens to `address`
-    pub fn mint(&mut self, address: Address, value: U256) -> Result<(), Erc20Error> {
-        // Increasing balance
-        let mut balance = self.balances.setter(address);
-        let new_balance = balance.get() + value;
-        balance.set(new_balance);
-
-        // Increasing total supply
-        self.total_supply.set(self.total_supply.get() + value);
-
-        // Emitting the transfer event
-        evm::log(Transfer {
-            from: Address::ZERO,
-            to: address,
-            value,
-        });
-
-        Ok(())
-    }
-
-    /// Burns `value` tokens from `address`
-    pub fn burn(&mut self, address: Address, value: U256) -> Result<(), Erc20Error> {
-        // Decreasing balance
-        let mut balance = self.balances.setter(address);
-        let old_balance = balance.get();
-        if old_balance < value {
-            return Err(Erc20Error::InsufficientBalance(InsufficientBalance {
-                from: address,
-                have: old_balance,
-                want: value,
-            }));
-        }
-        balance.set(old_balance - value);
-
-        // Decreasing the total supply
-        self.total_supply.set(self.total_supply.get() - value);
-
-        // Emitting the transfer event
-        evm::log(Transfer {
-            from: address,
-            to: Address::ZERO,
-            value,
-        });
-
-        Ok(())
-    }
-}
-
-// These methods are external to other contracts
-// Note: modifying storage will become much prettier soon
+// Declare that `VendingMachine` is a contract with the following external methods.
 #[public]
-impl<T: Erc20Params> Erc20<T> {
-    /// Immutable token name
-    pub fn name() -> String {
-        T::NAME.into()
-    }
+impl VendingMachine {
+    // Give a cupcake to the specified user if they are eligible (i.e., if at least 5 seconds have passed since their last cupcake).
+    pub fn give_cupcake_to(&mut self, user_address: Address) -> bool {
+        // Get the last distribution time for the user.
+        let last_distribution = self.cupcake_distribution_times.get(user_address);
+        // Calculate the earliest next time the user can receive a cupcake.
+        let five_seconds_from_last_distribution = last_distribution + U256::from(5);
 
-    /// Immutable token symbol
-    pub fn symbol() -> String {
-        T::SYMBOL.into()
-    }
+        // Get the current block timestamp.
+        let current_time = block::timestamp();
+        // Check if the user can receive a cupcake.
+        let user_can_receive_cupcake =
+            five_seconds_from_last_distribution <= Uint::<256, 4>::from(current_time);
 
-    /// Immutable token decimals
-    pub fn decimals() -> u8 {
-        T::DECIMALS
-    }
+        if user_can_receive_cupcake {
+            // Increment the user's cupcake balance.
+            let mut balance_accessor = self.cupcake_balances.setter(user_address);
+            let balance = balance_accessor.get() + U256::from(1);
+            balance_accessor.set(balance);
 
-    /// Total supply of tokens
-    pub fn total_supply(&self) -> U256 {
-        self.total_supply.get()
-    }
-
-    /// Balance of `address`
-    pub fn balance_of(&self, owner: Address) -> U256 {
-        self.balances.get(owner)
-    }
-
-    /// Transfers `value` tokens from msg::sender() to `to`
-    pub fn transfer(&mut self, to: Address, value: U256) -> Result<bool, Erc20Error> {
-        self._transfer(msg::sender(), to, value)?;
-        Ok(true)
-    }
-
-    /// Transfers `value` tokens from `from` to `to`
-    /// (msg::sender() must be able to spend at least `value` tokens from `from`)
-    pub fn transfer_from(
-        &mut self,
-        from: Address,
-        to: Address,
-        value: U256,
-    ) -> Result<bool, Erc20Error> {
-        // Check msg::sender() allowance
-        let mut sender_allowances = self.allowances.setter(from);
-        let mut allowance = sender_allowances.setter(msg::sender());
-        let old_allowance = allowance.get();
-        if old_allowance < value {
-            return Err(Erc20Error::InsufficientAllowance(InsufficientAllowance {
-                owner: from,
-                spender: msg::sender(),
-                have: old_allowance,
-                want: value,
-            }));
+            // Update the distribution time to the current time.
+            let mut time_accessor = self.cupcake_distribution_times.setter(user_address);
+            let new_distribution_time = block::timestamp();
+            time_accessor.set(Uint::<256, 4>::from(new_distribution_time));
+            return true;
+        } else {
+            // User must wait before receiving another cupcake.
+            console!(
+                "HTTP 429: Too Many Cupcakes (you must wait at least 5 seconds between cupcakes)"
+            );
+            return false;
         }
-
-        // Decreases allowance
-        allowance.set(old_allowance - value);
-
-        // Calls the internal transfer function
-        self._transfer(from, to, value)?;
-
-        Ok(true)
     }
 
-    /// Approves the spenditure of `value` tokens of msg::sender() to `spender`
-    pub fn approve(&mut self, spender: Address, value: U256) -> bool {
-        self.allowances.setter(msg::sender()).insert(spender, value);
-        evm::log(Approval {
-            owner: msg::sender(),
-            spender,
-            value,
-        });
-        true
+    // Get the cupcake balance for the specified user.
+    pub fn get_cupcake_balance_for(&self, user_address: Address) -> Uint<256, 4> {
+        // Return the user's cupcake balance from storage.
+        return self.cupcake_balances.get(user_address);
     }
-
-    /// Returns the allowance of `spender` on `owner`'s tokens
-    pub fn allowance(&self, owner: Address, spender: Address) -> U256 {
-        self.allowances.getter(owner).get(spender)
-    }
-}error[E0433]: failed to resolve: use of undeclared crate or module `alloc`
-  --> src/lib.rs:12:5
-   |
-12 | use alloc::string::String;
-   |     ^^^^^ use of undeclared crate or module `alloc`
-   |
-   = help: add `extern crate alloc` to use the `alloc` crate
-
-error[E0432]: unresolved import `alloc`
-   --> src/lib.rs:147:1
-    |
-147 | #[public]
-    | ^^^^^^^^^ help: a similar path exists: `std::alloc`
-    |
-    = note: this error originates in the attribute macro `public` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0433]: failed to resolve: use of undeclared crate or module `alloc`
-  --> src/lib.rs:57:10
-   |
-57 | #[derive(SolidityError)]
-   |          ^^^^^^^^^^^^^ use of undeclared crate or module `alloc`
-   |
-   = help: add `extern crate alloc` to use the `alloc` crate
-   = note: this error originates in the derive macro `SolidityError` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: consider importing this module
-   |
-12 + use std::vec;
-   |
-
-error[E0277]: the trait bound `Result<bool, Erc20Error>: EncodableReturnType` is not satisfied
-   --> src/lib.rs:175:61
-    |
-175 |     pub fn transfer(&mut self, to: Address, value: U256) -> Result<bool, Erc20Error> {
-    |                                                             ^^^^^^ the trait `EncodableReturnType` is not implemented for `Result<bool, Erc20Error>`
-    |
-    = help: the trait `EncodableReturnType` is implemented for `Result<T, E>`
-
-error[E0277]: the trait bound `Result<bool, Erc20Error>: EncodableReturnType` is not satisfied
-   --> src/lib.rs:187:10
-    |
-187 |     ) -> Result<bool, Erc20Error> {
-    |          ^^^^^^ the trait `EncodableReturnType` is not implemented for `Result<bool, Erc20Error>`
-    |
-    = help: the trait `EncodableReturnType` is implemented for `Result<T, E>`
-
-Some errors have detailed explanations: E0277, E0432, E0433.
-For more information about an error, try `rustc --explain E0277`.
-error: could not compile `stylus-hello-world` (lib) due to 5 previous errors
-xel@BlueBlack:~/git/stylus-hello-world$ 
+}
