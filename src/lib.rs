@@ -4,6 +4,8 @@ extern crate alloc;
 
 // Modules and imports
 mod erc20;
+mod event;
+use event::Event; // Trae la estructura Event al ámbito actual
 
 use alloy_primitives::{Address, U256};
 use stylus_sdk::{
@@ -11,12 +13,11 @@ use stylus_sdk::{
     prelude::*
 };
 use crate::erc20::{Erc20, Erc20Params, Erc20Error};
-
 /// Immutable definitions
-struct StylusTokenParams;
-impl Erc20Params for StylusTokenParams {
-    const NAME: &'static str = "StylusToken";
-    const SYMBOL: &'static str = "STK";
+struct ArenatonParams;
+impl Erc20Params for ArenatonParams {
+    const NAME: &'static str = "Arenaton";
+    const SYMBOL: &'static str = "ATON";
     const DECIMALS: u8 = 18;
 }
 
@@ -25,17 +26,24 @@ impl Erc20Params for StylusTokenParams {
 // storage slots and types.
 sol_storage! {
     #[entrypoint]
-    struct StylusToken {
-        // Allows erc20 to access StylusToken's storage and make calls
+    struct Arenaton {
+        // Allows erc20 to access Arenaton's storage and make calls
         #[borrow]
-        Erc20<StylusTokenParams> erc20;
+        Erc20<ArenatonParams> erc20;
     }
+
 }
 
 #[public]
-#[inherit(Erc20<StylusTokenParams>)]
-impl StylusToken {
+#[inherit(Erc20<ArenatonParams>)]
+impl Arenaton {
     /// Mints tokens
+    /// 
+    pub fn addEvent(&mut self, _id: u8, _starttime: U256) -> Result<(), Erc20Error> {
+        Ok(())
+    }
+
+
     pub fn mint(&mut self, value: U256) -> Result<(), Erc20Error> {
         self.erc20.mint(msg::sender(), value)?;
         Ok(())
