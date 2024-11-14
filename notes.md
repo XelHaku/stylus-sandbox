@@ -13,3 +13,7 @@ cast send 0xD9bF105CD8A3F3A4A3AE57aE9fB1b954a529b955 \
 
 
 cargo stylus deploy --private-key 0x9dc8c652a16755e58fe2ffae9991c895174f3746022b2a474f8d89694b4dc312 -e https://sepolia-rollup.arbitrum.io/rpc
+
+
+
+cargo stylus cache bid <ADDRESS> 0 --private-key <PRIVATE_KEY> -e <RPC_URL>
