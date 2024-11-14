@@ -33,7 +33,7 @@ sol_storage! {
 #[public]
 impl VendingMachine {
     // Give a cupcake to the specified user if they are eligible (i.e., if at least 5 seconds have passed since their last cupcake).
-    pub fn give_cupcake_to(&mut self, user_address: Address) -> bool {
+    pub fn give_cupcake_to2(&mut self, user_address: Address) -> bool {
         // Get the last distribution time for the user.
         let last_distribution = self.cupcake_distribution_times.get(user_address);
         // Calculate the earliest next time the user can receive a cupcake.

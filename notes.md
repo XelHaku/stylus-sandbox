@@ -10,3 +10,6 @@ cast send 0xD9bF105CD8A3F3A4A3AE57aE9fB1b954a529b955 \
     --rpc-url http://127.0.0.1:8547 \
     --gas-limit 21000 \
     --chain-id 412346
+
+
+cargo stylus deploy --private-key 0x9dc8c652a16755e58fe2ffae9991c895174f3746022b2a474f8d89694b4dc312 -e https://sepolia-rollup.arbitrum.io/rpc
