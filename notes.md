@@ -17,3 +17,15 @@ cargo stylus deploy --private-key 0x9dc8c652a16755e58fe2ffae9991c895174f3746022b
 
 
 cargo stylus cache bid <ADDRESS> 0 --private-key <PRIVATE_KEY> -e <RPC_URL>
+
+
+
+docker stop nitro-dev
+docker restart
+
+
+test
+
+
+
+chmod 644 /home/polar/git/stylus-sandbox/rust-toolchain.toml
