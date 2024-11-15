@@ -29,3 +29,4 @@ test
 
 
 chmod 644 /home/polar/git/stylus-sandbox/rust-toolchain.toml
+cargo fix --lib -p stylus-sandbox
